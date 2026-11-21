@@ -17,8 +17,14 @@ import {
   Camera,
   Play,
   RotateCcw,
+  Upload,
+  Image as ImageIcon,
+  Music,
+  FileText,
+  X,
+  FileCheck,
 } from "lucide-react";
-import { confirmPlan, generateVideo } from "@/lib/api";
+import { confirmPlan, generateVideo, uploadMediaFile } from "@/lib/api";
 import type { ConfirmedPlan } from "@/lib/types";
 
 export default function CreateVideoPage() {
@@ -63,6 +69,56 @@ export default function CreateVideoPage() {
   const [generationProgress, setGenerationProgress] = useState<number>(0);
   const [generatedVideo, setGeneratedVideo] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Multimodal Media & File Upload state
+  const [uploadedFiles, setUploadedFiles] = useState<
+    Array<{
+      filename: string;
+      media_type: "image" | "video" | "audio" | "document" | "file";
+      url: string;
+      size_bytes: number;
+    }>
+  >([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const res = await uploadMediaFile(f);
+        if (res && res.success) {
+          setUploadedFiles((prev) => [
+            ...prev,
+            {
+              filename: res.filename,
+              media_type: res.media_type,
+              url: res.url,
+              size_bytes: res.size_bytes,
+            },
+          ]);
+          // If script file was uploaded, fill or append text content
+          if (res.text_content && res.text_content.trim()) {
+            setTopic((prev) =>
+              prev.length > 5 ? `${prev}\n\n[Từ file ${res.filename}]:\n${res.text_content}` : res.text_content!
+            );
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      alert("Tải tệp lên thất bại: " + (err.message || "Lỗi mạng"));
+    } finally {
+      setIsUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const removeUploadedFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   // Toggle skill selection
   const toggleSkill = (skill: string) => {
@@ -228,16 +284,174 @@ export default function CreateVideoPage() {
         <div className="space-y-6">
           {/* Script / Prompt Input Box */}
           <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6 space-y-4 backdrop-blur-sm">
-            <label className="block text-sm font-semibold text-white">
-              Ý tưởng hoặc Kịch bản Video (User Input / Script)
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-semibold text-white">
+                Ý tưởng hoặc Kịch bản Video (User Input / Script)
+              </label>
+              {uploadedFiles.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    {uploadedFiles.some((f) => f.media_type === "image")
+                      ? "🖼️ Image-to-Video"
+                      : uploadedFiles.some((f) => f.media_type === "video")
+                      ? "🎥 Video-to-Video"
+                      : uploadedFiles.some((f) => f.media_type === "audio")
+                      ? "🎙️ Voice/Audio Sync"
+                      : "📄 Script Mode"}
+                  </span>
+                </div>
+              )}
+            </div>
             <textarea
               rows={4}
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="Nhập mô tả cảnh quay, kịch bản hoặc cốt truyện..."
+              placeholder="Nhập mô tả cảnh quay, kịch bản hoặc tải tệp lên bên dưới..."
               className="w-full rounded-xl bg-slate-950/80 border border-slate-700/80 p-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
+
+            {/* MULTIMODAL INPUT: Image, Video, Audio, Document File */}
+            <div className="pt-2 border-t border-slate-800/80 space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                  Đính Kèm Tệp Đa Phương Thức (Image, Video, Audio, Script)
+                </span>
+                <span className="text-[11px] font-normal text-slate-500">
+                  Image-to-Video • Video-to-Video • Voiceover • Kịch bản .txt/.pdf
+                </span>
+              </div>
+
+              {/* Upload Drop/Button Area */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {/* Image Upload */}
+                <label className="cursor-pointer p-3 rounded-xl bg-slate-950/60 hover:bg-slate-950 border border-slate-800 hover:border-indigo-500/40 text-center transition-all group flex flex-col items-center justify-center gap-1.5">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-300">Thêm Ảnh (Image)</span>
+                  <span className="text-[10px] text-slate-500">Image-to-Video</span>
+                </label>
+
+                {/* Video Upload */}
+                <label className="cursor-pointer p-3 rounded-xl bg-slate-950/60 hover:bg-slate-950 border border-slate-800 hover:border-purple-500/40 text-center transition-all group flex flex-col items-center justify-center gap-1.5">
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Film className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-300">Thêm Video Nguồn</span>
+                  <span className="text-[10px] text-slate-500">Video-to-Video</span>
+                </label>
+
+                {/* Audio Upload */}
+                <label className="cursor-pointer p-3 rounded-xl bg-slate-950/60 hover:bg-slate-950 border border-slate-800 hover:border-emerald-500/40 text-center transition-all group flex flex-col items-center justify-center gap-1.5">
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Music className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-300">Thêm Audio / Voice</span>
+                  <span className="text-[10px] text-slate-500">Khớp lời thoại</span>
+                </label>
+
+                {/* Document / Script Upload */}
+                <label className="cursor-pointer p-3 rounded-xl bg-slate-950/60 hover:bg-slate-950 border border-slate-800 hover:border-amber-500/40 text-center transition-all group flex flex-col items-center justify-center gap-1.5">
+                  <input
+                    type="file"
+                    accept=".txt,.md,.pdf,.docx"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-300">Tải File Kịch Bản</span>
+                  <span className="text-[10px] text-slate-500">.txt, .pdf, .md</span>
+                </label>
+              </div>
+
+              {/* Uploading progress indicator */}
+              {isUploading && (
+                <div className="text-xs text-indigo-400 flex items-center gap-2 py-1">
+                  <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  <span>Đang tải tệp lên máy chủ...</span>
+                </div>
+              )}
+
+              {/* Preview of Uploaded Files */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <div className="text-[11px] font-semibold uppercase text-slate-400 tracking-wider">
+                    Các tệp đã đính kèm ({uploadedFiles.length}):
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {uploadedFiles.map((file, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          {file.media_type === "image" && (
+                            <img
+                              src={`http://localhost:8000${file.url}`}
+                              alt={file.filename}
+                              className="w-9 h-9 rounded-lg object-cover border border-slate-800 shrink-0"
+                            />
+                          )}
+                          {file.media_type === "video" && (
+                            <div className="w-9 h-9 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                              <Film className="w-4 h-4" />
+                            </div>
+                          )}
+                          {file.media_type === "audio" && (
+                            <div className="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                              <Music className="w-4 h-4" />
+                            </div>
+                          )}
+                          {file.media_type === "document" && (
+                            <div className="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                              <FileCheck className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="truncate">
+                            <div className="font-medium text-white truncate max-w-[170px]">
+                              {file.filename}
+                            </div>
+                            <div className="text-[10px] text-slate-500 uppercase font-mono">
+                              {file.media_type} • {(file.size_bytes / 1024).toFixed(0)} KB
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeUploadedFile(idx)}
+                          className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                          title="Xóa tệp"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* AI Model Selector */}

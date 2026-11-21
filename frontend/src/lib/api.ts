@@ -510,4 +510,21 @@ export async function getProjectVideos(projectId: string): Promise<Video[]> {
   }, MOCK_VIDEOS.filter((v) => String(v.project_id) === String(projectId)));
 }
 
+export async function uploadMediaFile(file: File): Promise<{
+  success: boolean;
+  filename: string;
+  saved_as: string;
+  media_type: "image" | "video" | "audio" | "document" | "file";
+  url: string;
+  text_content?: string;
+  size_bytes: number;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await api.post("/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return unwrap(data);
+}
+
 export default api;

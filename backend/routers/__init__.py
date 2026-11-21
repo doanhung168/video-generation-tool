@@ -5,6 +5,7 @@ from routers.templates import router as templates_router
 from routers.settings import router as settings_router
 from routers.ai import router as ai_router
 from routers.dashboard import router as dashboard_router
+from routers.upload import router as upload_router
 
 __all__ = [
     "projects_router",
@@ -14,4 +15,5 @@ __all__ = [
     "settings_router",
     "ai_router",
     "dashboard_router",
+    "upload_router",
 ]
