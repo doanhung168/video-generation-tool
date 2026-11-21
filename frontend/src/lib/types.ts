@@ -87,6 +87,7 @@ export interface SceneItem {
   camera_angle?: string;
   lighting?: string;
   voiceover?: string;
+  voice_tag?: string;
 }
 
 export interface ConfirmedPlan {
@@ -95,6 +96,9 @@ export interface ConfirmedPlan {
   confirmed_skills: string[];
   scenes: SceneItem[];
   master_video_prompt: string;
+  language?: string;
+  voice_gender?: string;
+  voice_tone?: string;
   social_captions: {
     facebook?: string;
     tiktok?: string;
@@ -148,6 +152,9 @@ export interface GenerateVideoRequest {
   enhance_prompt?: boolean;
   confirmed_agent?: string;
   confirmed_skills?: string[];
+  language?: string;
+  voice_gender?: string;
+  voice_tone?: string;
 }
 
 export type GenerateVideoPayload = GenerateVideoRequest;

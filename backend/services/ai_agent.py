@@ -15,18 +15,37 @@ class AIAgent:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or settings.GOOGLE_API_KEY
+        self.api_key = api_key
         self.kimi = KimiService()
         self._client = None
+        self._last_key = None
+
+    @property
+    def active_key(self) -> str:
+        if self.api_key and not self.api_key.startswith("****"):
+            return self.api_key
+        try:
+            from routers.settings import _get
+            k = _get("google_api_key")
+            if k and not k.startswith("****"):
+                return k
+        except Exception:
+            pass
+        return getattr(settings, "GOOGLE_API_KEY", "")
 
     def _get_client(self):
-        """Lazily initialize the Google GenAI client."""
-        if self._client is None and self.api_key:
+        """Lazily initialize or refresh the Google GenAI client."""
+        key = self.active_key
+        if not key or key.startswith("****"):
+            return None
+        if self._client is None or self._last_key != key:
             try:
                 from google import genai
-                self._client = genai.Client(api_key=self.api_key)
+                self._client = genai.Client(api_key=key)
+                self._last_key = key
             except Exception as e:
                 logger.warning("Failed to initialize Google GenAI Client: %s", e)
+                return None
         return self._client
 
     async def _generate_text(self, system_prompt: str, user_prompt: str) -> str:
@@ -52,7 +71,7 @@ class AIAgent:
                 logger.warning("Gemini API call failed: %s", exc)
 
         # Fallback to Kimi if configured
-        if settings.KIMI_API_KEY:
+        if self.kimi.active_key:
             try:
                 kimi_res = await self.kimi.generate_script_and_scenes(user_prompt)
                 return kimi_res.get("master_video_prompt", user_prompt)
@@ -69,32 +88,70 @@ class AIAgent:
         style: str = "cinematic",
         duration: int = 15,
         engine: str = "veo3",
+        language: str = "vi",
+        voice_gender: str = "female",
+        voice_tone: str = "youthful_energetic",
     ) -> Dict[str, Any]:
         """
         Orchestrates the 'Confirm Skill, Prompt, Agent' step before video rendering.
-        Returns full structured details for user review & confirmation.
+        Injects chosen language and voice gender/tone directly into the prompt and screenplay.
         """
         skills = skills or ["Cinematic 4K", "Fluid Motion", "Dynamic Lighting", "3s Viral Hook"]
 
-        # Call Kimi or Gemini to generate production plan
+        from services.kimi_service import LANG_MAP, VOICE_GENDER_MAP, VOICE_TONE_MAP
+        lang_info = LANG_MAP.get(language, LANG_MAP["vi"])
+        gender_info = VOICE_GENDER_MAP.get(voice_gender, VOICE_GENDER_MAP["female"])
+        tone_info = VOICE_TONE_MAP.get(voice_tone, VOICE_TONE_MAP["youthful_energetic"])
+
         client = self._get_client()
         if client:
             try:
                 import asyncio
                 system_instruction = (
-                    f"You are {agent_role}, a master AI video director. Active skills: {', '.join(skills)}. "
-                    f"Target video engine: {engine}. Produce a valid JSON video plan:\n"
+                    f"Bạn là {agent_role}, một đạo diễn video AI và chuyên gia sáng tạo kịch bản hàng đầu thế giới. "
+                    f"Kỹ năng đang kích hoạt: {', '.join(skills)}. Model video đích: {engine}.\n"
+                    f"CẤU HÌNH NGÔN NGỮ & GIỌNG ĐỌC BẮT BUỘC:\n"
+                    f"- Ngôn ngữ kịch bản & Voiceover: {lang_info['name']} ({lang_info['en_name']})\n"
+                    f"- Giọng đọc: {gender_info['name']} ({gender_info['en']})\n"
+                    f"- Sắc thái giọng (Tone): {tone_info['name']} ({tone_info['en']})\n\n"
+                    "QUY TẮC BẮT BUỘC:\n"
+                    "1. Đọc kỹ yêu cầu và đối tượng mục tiêu của người dùng. Tự động chuyển thể thành kịch bản chuyên nghiệp, phù hợp với sản phẩm/nội dung.\n"
+                    "2. TUYỆT ĐỐI KHÔNG lặp lại các câu lệnh thô (như 'Tạo một video quảng cáo...', 'Đối tượng: ...') vào lời thoại voiceover hay tiêu đề!\n"
+                    f"3. 'title', 'scenes[].voiceover', và 'social_captions' PHẢI viết chuẩn bằng {lang_info['name']}. Lời voiceover phải thể hiện đúng sắc thái ({tone_info['name']}) và giới tính giọng đọc ({gender_info['name']}).\n"
+                    "4. 'scenes[].visual_prompt' và 'master_video_prompt' PHẢI viết bằng TIẾNG ANH chi tiết chuẩn điện ảnh 4K (ánh sáng, chuyển động máy quay, góc máy, chi tiết vật liệu) để đưa vào model video.\n"
+                    f"5. Cuối 'master_video_prompt' PHẢI chèn chỉ thị âm thanh: '[Audio Directive: {gender_info['en']} voiceover in {lang_info['en_name']}, tone: {tone_info['en']}, professional studio acoustic, synced pacing]'.\n"
+                    "Xuất định dạng JSON hợp lệ:\n"
                     "{\n"
-                    '  "title": "Title",\n'
-                    '  "agent_profile": "Agent persona summary",\n'
-                    '  "confirmed_skills": ["Skill1", "Skill2"],\n'
-                    '  "scenes": [{"scene_num": 1, "duration_seconds": 5, "visual_prompt": "...", "camera_angle": "...", "lighting": "..."}],\n'
-                    '  "master_video_prompt": "Ultra-rich master prompt for video generator",\n'
+                    '  "title": "Tên video hấp dẫn",\n'
+                    '  "agent_profile": "Tóm tắt vai trò đạo diễn và chiến lược phân cảnh",\n'
+                    '  "language": "' + language + '",\n'
+                    '  "voice_gender": "' + voice_gender + '",\n'
+                    '  "voice_tone": "' + voice_tone + '",\n'
+                    '  "confirmed_skills": ["Skill 1", "Skill 2"],\n'
+                    '  "scenes": [\n'
+                    '    {\n'
+                    '      "scene_num": 1,\n'
+                    '      "duration_seconds": 3,\n'
+                    '      "visual_prompt": "Ultra-detailed visual description in English",\n'
+                    '      "camera_angle": "Low-angle dynamic tracking shot",\n'
+                    '      "lighting": "Golden hour glow",\n'
+                    '      "voiceover": "Lời thoại thu hút theo đúng ngôn ngữ và sắc thái giọng đã chọn",\n'
+                    '      "voice_tag": "[' + gender_info['name'] + ' - ' + tone_info['name'].split(',')[0] + ' | ' + lang_info['name'] + ']"\n'
+                    '    }\n'
+                    '  ],\n'
+                    '  "master_video_prompt": "High-fidelity English video prompt with [Audio Directive: ...]",\n'
                     '  "social_captions": {"facebook": "...", "tiktok": "...", "youtube": "..."},\n'
                     '  "hashtags": ["#tag1", "#tag2"]\n'
                     "}"
                 )
-                user_msg = f"Topic: {topic}\nDuration: {duration}s\nStyle: {style}\nOutput JSON only."
+                user_msg = (
+                    f"Yêu cầu kịch bản: {topic}\n"
+                    f"Thời lượng: {duration} giây\n"
+                    f"Phong cách hình ảnh: {style}\n"
+                    f"Ngôn ngữ: {lang_info['name']}\n"
+                    f"Giọng đọc: {gender_info['name']} - Sắc thái: {tone_info['name']}\n"
+                    "Hãy phân tích và xuất JSON kế hoạch sản xuất video hoàn chỉnh."
+                )
                 res = await asyncio.to_thread(
                     client.models.generate_content,
                     model="gemini-2.0-flash",
@@ -108,14 +165,18 @@ class AIAgent:
                 if res and res.text:
                     return json.loads(res.text)
             except Exception as e:
-                logger.warning("Gemini confirm_skill failed, trying Kimi: %s", e)
+                logger.warning("Gemini confirm_skill failed, falling back to smart synthesis: %s", e)
 
+        # Fallback to Kimi or Smart Semantic Synthesizer
         return await self.kimi.generate_script_and_scenes(
             topic=topic,
             agent_role=agent_role,
             skills=skills,
             duration=duration,
             style=style,
+            language=language,
+            voice_gender=voice_gender,
+            voice_tone=voice_tone,
         )
 
     async def enhance_prompt(
@@ -128,7 +189,7 @@ class AIAgent:
         system = (
             "You are an expert cinematographer and AI video prompt engineer. "
             "Expand the prompt with camera angles, 8k resolution details, cinematic lighting, "
-            "depth of field, and fluid motion. Output ONLY the prompt."
+            "depth of field, and fluid motion. Output ONLY the prompt in English."
         )
         user = f"Style: {style}\nContext: {context}\nOriginal prompt:\n{raw_prompt}"
         res = await self._generate_text(system, user)
@@ -144,10 +205,10 @@ class AIAgent:
         style: str = "informative",
     ) -> str:
         """Generate a full scene-by-scene script."""
-        system = "You are a professional video scriptwriter. Format as Markdown with scenes, visuals, voiceover."
-        user = f"Topic: {topic}\nDuration: {duration} seconds\nStyle: {style}"
+        system = "Bạn là biên kịch video chuyên nghiệp. Hãy viết kịch bản phân cảnh tiếng Việt chi tiết gồm hình ảnh, lời thoại và ghi chú âm thanh."
+        user = f"Chủ đề: {topic}\nThời lượng: {duration} giây\nPhong cách: {style}"
         res = await self._generate_text(system, user)
-        return res or f"# Script: {topic}\n\n## Scene 1 (0-5s)\nVisual: Establishing shot of {topic}.\nVoiceover: Welcome."
+        return res or f"# Kịch bản: {topic}\n\n## Cảnh 1 (0-5s)\nHình ảnh: Giới thiệu ấn tượng về {topic}.\nLời bình: Chào mừng bạn đến với trải nghiệm mới."
 
     async def suggest_hashtags(
         self,
@@ -156,11 +217,11 @@ class AIAgent:
         platform: str = "all",
     ) -> List[str]:
         """Suggest trending hashtags."""
-        tags = ["#AIvideo", "#VideoGeneration", "#Tech", "#Viral", "#Creator"]
+        tags = ["#AIvideo", "#VideoGeneration", "#Trending", "#Viral", "#Xuhuong"]
         if "tiktok" in platform.lower():
-            tags += ["#fyp", "#foryou", "#trending"]
+            tags += ["#fyp", "#foryou", "#tiktokviral"]
         elif "youtube" in platform.lower():
-            tags += ["#Shorts", "#YouTubeShorts", "#ContentCreator"]
+            tags += ["#Shorts", "#YouTubeShorts", "#Review"]
         elif "facebook" in platform.lower():
             tags += ["#Reels", "#FacebookReels", "#VideoViral"]
         return tags
@@ -175,5 +236,5 @@ class AIAgent:
         return (
             f"🎬 {title}\n\n"
             f"{description or 'Trải nghiệm video chất lượng cao được sản xuất hoàn toàn tự động bằng AI!'}\n\n"
-            f"👉 Xem ngay và để lại cảm nhận của bạn bên dưới!"
+            f"👉 Xem ngay và để lại cảm nhận của bạn bên dưới! #xuhuong #aivideo"
         )

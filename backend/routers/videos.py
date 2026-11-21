@@ -34,6 +34,9 @@ class VideoGenerateRequest(BaseModel):
     enhance_prompt: bool = Field(default=False)
     confirmed_agent: Optional[str] = None
     confirmed_skills: Optional[List[str]] = None
+    language: Optional[str] = Field(default="vi")
+    voice_gender: Optional[str] = Field(default="female")
+    voice_tone: Optional[str] = Field(default="youthful_energetic")
 
 
 class ConfirmPlanRequest(BaseModel):
@@ -43,6 +46,9 @@ class ConfirmPlanRequest(BaseModel):
     style: str = Field(default="cinematic")
     duration: int = Field(default=15)
     engine: str = Field(default="veo3")
+    language: str = Field(default="vi")  # vi, en, ja, ko, zh, fr, es
+    voice_gender: str = Field(default="female")  # female, male, none
+    voice_tone: str = Field(default="youthful_energetic")
 
 
 class VideoOut(BaseModel):
@@ -92,6 +98,9 @@ async def confirm_plan(request: ConfirmPlanRequest):
         style=request.style,
         duration=request.duration,
         engine=request.engine,
+        language=request.language,
+        voice_gender=request.voice_gender,
+        voice_tone=request.voice_tone,
     )
     return plan
 

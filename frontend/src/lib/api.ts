@@ -483,6 +483,9 @@ export async function confirmPlan(payload: {
   style?: string;
   duration?: number;
   engine?: string;
+  language?: string;
+  voice_gender?: string;
+  voice_tone?: string;
 }): Promise<any> {
   const { data } = await api.post("/videos/confirm-plan", payload);
   return data;

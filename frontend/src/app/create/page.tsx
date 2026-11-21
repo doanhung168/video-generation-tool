@@ -23,9 +23,36 @@ import {
   FileText,
   X,
   FileCheck,
+  Mic,
+  Globe,
+  Volume2,
 } from "lucide-react";
 import { confirmPlan, generateVideo, uploadMediaFile } from "@/lib/api";
 import type { ConfirmedPlan } from "@/lib/types";
+
+const LANGUAGES = [
+  { id: "vi", flag: "🇻🇳", name: "Tiếng Việt", desc: "Mặc định, chuẩn giọng Việt tự nhiên" },
+  { id: "en", flag: "🇺🇸", name: "English (US/UK)", desc: "Global reach & international market" },
+  { id: "ja", flag: "🇯🇵", name: "日本語 (Japanese)", desc: "Tokyo style, anime & tech" },
+  { id: "ko", flag: "🇰🇷", name: "한국어 (Korean)", desc: "K-Wave, fashion & aesthetics" },
+  { id: "zh", flag: "🇨🇳", name: "中文 (Chinese)", desc: "Douyin viral commerce style" },
+  { id: "fr", flag: "🇫🇷", name: "Français (French)", desc: "Haute couture & luxury lifestyle" },
+  { id: "es", flag: "🇪🇸", name: "Español (Spanish)", desc: "Viral latino & energetic lifestyle" },
+];
+
+const VOICE_GENDERS = [
+  { id: "female", icon: "👩", name: "Giọng Nữ (Female)", desc: "Cuốn hút, truyền cảm, tự nhiên (Thời trang, Mỹ phẩm, Vlog)" },
+  { id: "male", icon: "👨", name: "Giọng Nam (Male)", desc: "Trầm ấm, nam tính, uy tín (Doanh nghiệp, Công nghệ, Thể thao)" },
+  { id: "none", icon: "🎵", name: "Chỉ Nhạc Nền (No Voice)", desc: "Không lời thoại, tập trung hiệu ứng âm thanh & hình ảnh" },
+];
+
+const VOICE_TONES = [
+  { id: "youthful_energetic", name: "Trẻ trung, năng động", desc: "Chuẩn TikTok, Reels, Gen Z, sôi động" },
+  { id: "warm_inspiring", name: "Trầm ấm, truyền cảm", desc: "Doanh nghiệp, thương hiệu, truyền cảm hứng" },
+  { id: "luxurious_soft", name: "Sang trọng, nhẹ nhàng", desc: "Mỹ phẩm cao cấp, nước hoa, quý phái" },
+  { id: "dramatic_epic", name: "Hào hùng, kịch tính", desc: "Cinematic trailer, gaming, thể thao" },
+  { id: "natural_story", name: "Gần gũi, đời thường", desc: "Vlog, review sản phẩm, podcast thân thiện" },
+];
 
 export default function CreateVideoPage() {
   const router = useRouter();
@@ -42,6 +69,11 @@ export default function CreateVideoPage() {
   const [duration, setDuration] = useState<number>(15);
   const [aspectRatio, setAspectRatio] = useState<string>("16:9");
   const [resolution, setResolution] = useState<string>("720p");
+
+  // Language & Voiceover injection state
+  const [language, setLanguage] = useState<string>("vi");
+  const [voiceGender, setVoiceGender] = useState<string>("female");
+  const [voiceTone, setVoiceTone] = useState<string>("youthful_energetic");
 
   // Agent & Skills state
   const [agentRole, setAgentRole] = useState<string>("Cinematic Film Director");
@@ -140,6 +172,9 @@ export default function CreateVideoPage() {
         style,
         duration,
         engine,
+        language,
+        voice_gender: voiceGender,
+        voice_tone: voiceTone,
       });
       setPlan(result);
       setEditableMasterPrompt(result.master_video_prompt || topic);
@@ -147,43 +182,72 @@ export default function CreateVideoPage() {
     } catch (err: any) {
       console.error("Confirmation error:", err);
       // Fallback local plan if offline
+      const langName = LANGUAGES.find((l) => l.id === language)?.name || "Tiếng Việt";
+      const gName = voiceGender === "male" ? "Giọng Nam" : voiceGender === "female" ? "Giọng Nữ" : "Chỉ Nhạc Nền";
+      const tag = `[${gName} | ${langName}]`;
+
       const mockPlan: ConfirmedPlan = {
-        title: `Cinematic: ${topic.slice(0, 35)}...`,
-        agent_profile: `AI ${agentRole} phụ trách chỉ đạo kịch bản, ánh sáng và phân cảnh`,
+        title: `Video Sáng Tạo: ${topic.slice(0, 35)}...`,
+        agent_profile: `AI ${agentRole} phụ trách chỉ đạo kịch bản, âm thanh và phân cảnh`,
         confirmed_skills: selectedSkills,
+        language,
+        voice_gender: voiceGender,
+        voice_tone: voiceTone,
         scenes: [
           {
             scene_num: 1,
             duration_seconds: 3,
-            visual_prompt: `Góc quay mở đầu kịch tính: ${topic}. Ánh sáng điện ảnh cao cấp.`,
+            visual_prompt: `Dynamic low-angle slow motion establishing shot of ${topic}, soft volumetric lighting, 35mm lens, 4k photorealistic.`,
             camera_angle: "Low-angle smooth tracking shot",
             lighting: "Golden hour glow & volumetric haze",
-            voiceover: "Mỗi hành trình vĩ đại đều bắt đầu từ một khoảnh khắc tĩnh lặng.",
+            voiceover:
+              voiceGender === "none"
+                ? "[Nhạc nền sôi động, không lời]"
+                : language === "vi"
+                ? "Tự tin trong từng bước chuyển động, định hình phong cách riêng của bạn."
+                : "Step into confidence and make every movement your personal statement.",
+            voice_tag: tag,
           },
           {
             scene_num: 2,
             duration_seconds: 5,
-            visual_prompt: `Cận cảnh chi tiết tấm kính mũ phản chiếu bề mặt Sao Hỏa.`,
-            camera_angle: "Macro slow pan with bokeh",
-            lighting: "Deep contrast and red amber rim-light",
-            voiceover: "Nơi ranh giới giữa con người và vũ trụ trở nên vô tận.",
+            visual_prompt: `Hyper-detailed macro close-up showcasing textures, materials, and elegant details under studio lighting.`,
+            camera_angle: "Macro slow pan with shallow depth of field",
+            lighting: "High contrast studio rim highlights",
+            voiceover:
+              voiceGender === "none"
+                ? "[Nhịp điệu dồn dập, hiệu ứng âm thanh sống động]"
+                : language === "vi"
+                ? "Thiết kế thời thượng, êm ái vượt trội cho ngày dài năng động."
+                : "Unrivaled comfort engineered for all-day elegance and performance.",
+            voice_tag: tag,
           },
           {
             scene_num: 3,
             duration_seconds: duration - 8 > 0 ? duration - 8 : 4,
-            visual_prompt: `Góc máy fly-cam từ từ nâng cao, bao quát cả thung lũng Sao Hỏa.`,
+            visual_prompt: `Confident cinematic hero shot, seamless camera sweep revealing full view against metropolitan skyline at dusk.`,
             camera_angle: "Wide crane pullback reveal",
-            lighting: "Dramatic horizon sunset",
-            voiceover: "Tương lai thuộc về những người dám bước tiếp.",
+            lighting: "Golden hour glow with dramatic reflections",
+            voiceover:
+              voiceGender === "none"
+                ? "[Cao trào âm nhạc, hiển thị nhận diện thương hiệu]"
+                : language === "vi"
+                ? "Nâng tầm phong cách mỗi ngày. Khám phá ngay hôm nay!"
+                : "Own every step. Discover the new collection today!",
+            voice_tag: tag,
           },
         ],
-        master_video_prompt: `Masterpiece cinematic 4K video of ${topic}. Shot on 35mm Arri Alexa, ${style} aesthetic, professional color grading, dynamic camera movement, volumetric lighting, photorealistic details.`,
+        master_video_prompt: `Masterpiece cinematic 4K commercial video of ${topic}. Shot on 35mm Arri Alexa, ${style} aesthetic, professional color grading, dynamic camera movement, volumetric lighting, photorealistic details. [Audio Directive: ${
+          voiceGender === "none"
+            ? "Instrumental background music only, no voiceover"
+            : `${voiceGender === "male" ? "Male" : "Female"} voiceover in ${langName}, energetic tone, crisp studio recording`
+        }]`,
         social_captions: {
-          facebook: `🚀 Trải nghiệm thước phim điện ảnh được tạo tự động bởi AI (${engine.toUpperCase()})!`,
-          tiktok: `🔥 Cảnh tượng choáng ngợp này được tạo hoàn toàn bằng AI! #fyp #viral #ai`,
-          youtube: `Khám phá vũ trụ qua góc nhìn AI với Google Veo 3 & Wan 2.1.`,
+          facebook: `🚀 Trải nghiệm video được tạo tự động bởi AI (${engine.toUpperCase()})!`,
+          tiktok: `🔥 Cực phẩm đã chính thức ra mắt! #fyp #viral #ai #xuhuong`,
+          youtube: `Video chi tiết - Sản xuất tự động bởi AutoVideo AI (${engine.toUpperCase()}).`,
         },
-        hashtags: ["#AIvideo", "#Veo3", "#Wan21", "#Seedance", "#SciFi", "#Cinematic"],
+        hashtags: ["#AIvideo", "#Veo3", "#Wan21", "#Seedance", "#Cinematic", "#Viral"],
       };
       setPlan(mockPlan);
       setEditableMasterPrompt(mockPlan.master_video_prompt);
@@ -191,6 +255,13 @@ export default function CreateVideoPage() {
     } finally {
       setConfirming(false);
     }
+  };
+
+  const handleUpdateSceneVoiceover = (idx: number, newVoiceover: string) => {
+    if (!plan) return;
+    const updated = [...plan.scenes];
+    updated[idx] = { ...updated[idx], voiceover: newVoiceover };
+    setPlan({ ...plan, scenes: updated });
   };
 
   // Step 2 -> Step 3: Trigger Final Video Generation
@@ -215,6 +286,9 @@ export default function CreateVideoPage() {
         style,
         confirmed_agent: agentRole,
         confirmed_skills: selectedSkills,
+        language,
+        voice_gender: voiceGender,
+        voice_tone: voiceTone,
       });
 
       clearInterval(progressTimer);
@@ -601,6 +675,118 @@ export default function CreateVideoPage() {
             </div>
           </div>
 
+          {/* Audio, Voiceover & Language Injection Selector */}
+          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6 space-y-5 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block text-sm font-semibold text-white flex items-center gap-2">
+                  <Mic className="w-4 h-4 text-emerald-400" />
+                  Ngôn Ngữ &amp; Giọng Đọc (Voiceover Prompt Injection)
+                </label>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Tự động inject ngôn ngữ, giới tính giọng đọc và sắc thái vào kịch bản &amp; prompt video
+                </p>
+              </div>
+              <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono">
+                Prompt Injected
+              </span>
+            </div>
+
+            {/* Language Selector */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-blue-400" />
+                1. Ngôn ngữ kịch bản &amp; Voiceover
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                {LANGUAGES.map((lang) => {
+                  const isSelected = language === lang.id;
+                  return (
+                    <button
+                      key={lang.id}
+                      type="button"
+                      onClick={() => setLanguage(lang.id)}
+                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                        isSelected
+                          ? "bg-blue-600/20 border-blue-500 text-white ring-1 ring-blue-500/50"
+                          : "bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="text-lg mb-0.5">{lang.flag}</div>
+                      <div className="text-xs font-semibold truncate">{lang.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Voice Gender & Tone */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Voice Gender */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                  2. Giọng đọc (Voice Gender)
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {VOICE_GENDERS.map((vg) => {
+                    const isSelected = voiceGender === vg.id;
+                    return (
+                      <button
+                        key={vg.id}
+                        type="button"
+                        onClick={() => setVoiceGender(vg.id)}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? "bg-amber-500/15 border-amber-500 text-amber-200 ring-1 ring-amber-500/40"
+                            : "bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="text-base mb-1">{vg.icon}</div>
+                        <div className="text-xs font-semibold text-white">
+                          {vg.name.split(" ")[0]} {vg.name.split(" ")[1]}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{vg.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Voice Tone */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  3. Sắc thái &amp; Phong cách (Tone)
+                </label>
+                <select
+                  value={voiceTone}
+                  onChange={(e) => setVoiceTone(e.target.value)}
+                  disabled={voiceGender === "none"}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-40"
+                >
+                  {VOICE_TONES.map((vt) => (
+                    <option key={vt.id} value={vt.id}>
+                      {vt.name} — ({vt.desc})
+                    </option>
+                  ))}
+                </select>
+                <div className="text-[11px] text-slate-400 mt-2 px-1 flex items-center gap-1.5">
+                  <span className="text-indigo-400 font-semibold">💡 Inject Directive:</span>
+                  <span className="truncate">
+                    [{LANGUAGES.find((l) => l.id === language)?.name}] • [
+                    {voiceGender === "none"
+                      ? "Chỉ nhạc nền"
+                      : `${voiceGender === "male" ? "Giọng Nam" : "Giọng Nữ"} - ${
+                          VOICE_TONES.find((t) => t.id === voiceTone)?.name
+                        }`}
+                    ]
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Technical Specs: Duration, Ratio, Resolution */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
@@ -688,8 +874,8 @@ export default function CreateVideoPage() {
             </p>
           </div>
 
-          {/* Confirmed Agent Profile & Skills */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Confirmed Agent Profile, Skills & Audio Directives */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-5 space-y-2">
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Confirmed AI Agent
@@ -716,35 +902,87 @@ export default function CreateVideoPage() {
                 ))}
               </div>
             </div>
+
+            <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-5 space-y-2">
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Mic className="w-3.5 h-3.5 text-emerald-400" />
+                Audio &amp; Voiceover Injection
+              </div>
+              <div className="text-sm font-bold text-white flex items-center gap-2">
+                <span>{LANGUAGES.find((l) => l.id === language)?.flag}</span>
+                <span>{LANGUAGES.find((l) => l.id === language)?.name}</span>
+                <span className="text-slate-500">•</span>
+                <span className="text-amber-300">
+                  {voiceGender === "none"
+                    ? "Chỉ Nhạc Nền"
+                    : voiceGender === "male"
+                    ? "Giọng Nam"
+                    : "Giọng Nữ"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Sắc thái: <span className="text-slate-200">{VOICE_TONES.find((t) => t.id === voiceTone)?.name}</span>
+              </p>
+            </div>
           </div>
 
           {/* Scene Breakdown */}
           <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-6 space-y-4">
-            <h3 className="font-bold text-white text-sm flex items-center gap-2">
-              <Film className="w-4 h-4 text-indigo-400" />
-              Phân Cảnh Chi Tiết (Scene Breakdown)
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                <Film className="w-4 h-4 text-indigo-400" />
+                Phân Cảnh Chi Tiết (Scene Breakdown)
+              </h3>
+              <span className="text-xs text-slate-400 font-mono">
+                {plan.scenes.length} Phân cảnh • {duration}s
+              </span>
+            </div>
 
             <div className="space-y-3">
               {plan.scenes.map((scene, idx) => (
                 <div
                   key={idx}
-                  className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2"
+                  className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-3"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-indigo-400">
+                    <span className="font-bold text-indigo-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
                       Cảnh {scene.scene_num || idx + 1} ({scene.duration_seconds}s)
                     </span>
-                    <span className="text-slate-400 font-mono text-[11px]">
-                      {scene.camera_angle || "Cinematic Angle"}
+                    <span className="text-slate-400 font-mono text-[11px] bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                      🎥 {scene.camera_angle || "Cinematic Angle"}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-200">{scene.visual_prompt}</p>
-                  {scene.voiceover && (
-                    <div className="text-xs text-amber-300/90 bg-amber-950/20 border border-amber-500/20 px-3 py-1.5 rounded-lg">
-                      🎙️ <em>Voiceover:</em> &quot;{scene.voiceover}&quot;
+
+                  <div>
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                      Visual Prompt (Prompt hình ảnh cho AI Video):
                     </div>
-                  )}
+                    <p className="text-xs text-slate-200 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/60 leading-relaxed font-mono">
+                      {scene.visual_prompt}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-amber-300 flex items-center gap-1.5">
+                        <Mic className="w-3.5 h-3.5 text-amber-400" />
+                        Lời Thoại / Voiceover {scene.voice_tag && (
+                          <span className="font-mono text-[10px] text-amber-400/90 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
+                            {scene.voice_tag}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Chỉnh sửa lời thoại trực tiếp</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={scene.voiceover || ""}
+                      onChange={(e) => handleUpdateSceneVoiceover(idx, e.target.value)}
+                      placeholder="Nhập lời thoại voiceover..."
+                      className="w-full text-xs text-amber-100 bg-amber-950/20 border border-amber-500/30 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
