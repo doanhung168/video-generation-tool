@@ -456,9 +456,17 @@ export async function updateSettings(settings: Partial<Settings>): Promise<Setti
   return unwrap<Settings>(data);
 }
 
-export async function testConnection(platform: string): Promise<{ connected: boolean; message?: string; error?: string }> {
+export async function testConnection(
+  platform: string,
+  payload?: {
+    api_key?: string;
+    token?: string;
+    page_id?: string;
+    refresh_token?: string;
+  }
+): Promise<{ connected: boolean; message?: string; error?: string; details?: any }> {
   try {
-    const { data } = await api.post(`/settings/test-connection/${platform}`);
+    const { data } = await api.post(`/settings/test-connection/${platform}`, payload || {});
     return unwrap(data);
   } catch (err: any) {
     return { connected: false, error: err.response?.data?.detail || err.message };

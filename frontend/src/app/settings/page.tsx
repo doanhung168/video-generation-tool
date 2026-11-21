@@ -202,20 +202,48 @@ export default function SettingsPage() {
 
   const runTest = async (platform: string) => {
     setTestResults((p) => ({ ...p, [platform]: { status: "testing", msg: "Đang kiểm tra kết nối..." } }));
+    
+    // Gather current input value from the form
+    let testPayload: any = {};
+    if (platform === "google") {
+      testPayload = { api_key: keys.google_api_key };
+    } else if (platform === "kimi") {
+      testPayload = { api_key: keys.kimi_api_key };
+    } else if (platform === "wan") {
+      testPayload = { api_key: keys.wan_api_key };
+    } else if (platform === "seedance") {
+      testPayload = { api_key: keys.seedance_api_key };
+    } else if (platform === "facebook") {
+      testPayload = { token: keys.facebook_access_token, page_id: keys.facebook_page_id };
+    } else if (platform === "tiktok") {
+      testPayload = { token: keys.tiktok_access_token };
+    } else if (platform === "youtube") {
+      testPayload = { api_key: keys.youtube_api_key, refresh_token: keys.youtube_refresh_token };
+    }
+
     try {
-      const res = await testConnection(platform);
+      const res = await testConnection(platform, testPayload);
       if (res && res.connected) {
-        setTestResults((p) => ({ ...p, [platform]: { status: "ok", msg: "Kết nối thành công! API hoạt động." } }));
+        setTestResults((p) => ({
+          ...p,
+          [platform]: { status: "ok", msg: "Kết nối thành công! API hoạt động tốt." },
+        }));
       } else {
         setTestResults((p) => ({
           ...p,
-          [platform]: { status: "error", msg: (res as any)?.error || res?.message || "Chưa cấu hình hoặc key không hợp lệ (Chế độ simulation đang bật)" },
+          [platform]: {
+            status: "error",
+            msg: res?.error || (res as any)?.message || "Key chưa được nhập hoặc không hợp lệ. Vui lòng nhập key vào ô bên dưới trước khi Test.",
+          },
         }));
       }
     } catch (err: any) {
       setTestResults((p) => ({
         ...p,
-        [platform]: { status: "ok", msg: "Sẵn sàng (Chế độ Local Engine Fallback đang hoạt động)" },
+        [platform]: {
+          status: "error",
+          msg: err.message || "Lỗi khi kiểm tra kết nối.",
+        },
       }));
     }
   };
