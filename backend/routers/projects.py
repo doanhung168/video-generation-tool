@@ -183,3 +183,10 @@ async def get_project_stats(project_id: int, db: AsyncSession = Depends(get_db))
         failed_videos=failed_videos,
         pending_videos=pending_videos,
     )
+
+
+@router.get("/{project_id}/videos")
+async def get_project_videos_endpoint(project_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Video).where(Video.project_id == project_id).order_by(desc(Video.created_at)))
+    return list(result.scalars().all())
+

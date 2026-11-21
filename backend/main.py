@@ -15,6 +15,8 @@ from routers import (
     social_router,
     templates_router,
     settings_router,
+    ai_router,
+    dashboard_router,
 )
 from utils.helpers import get_storage_path
 
@@ -96,6 +98,8 @@ app.include_router(projects_router, prefix=API_V1)
 app.include_router(social_router, prefix=API_V1)
 app.include_router(templates_router, prefix=API_V1)
 app.include_router(settings_router, prefix=API_V1)
+app.include_router(ai_router, prefix=API_V1)
+app.include_router(dashboard_router, prefix=API_V1)
 
 # Serve generated videos and thumbnails statically
 storage_dir = Path(settings.STORAGE_PATH).resolve()

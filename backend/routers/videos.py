@@ -146,6 +146,7 @@ async def generate_video(
     return video
 
 
+@router.get("", response_model=List[VideoOut])
 @router.get("/list", response_model=List[VideoOut])
 async def list_videos(
     project_id: Optional[int] = Query(None),

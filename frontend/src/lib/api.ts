@@ -285,13 +285,24 @@ export const MOCK_SETTINGS: Settings = {
   youtube: { api_key: "", client_id: "", client_secret: "", refresh_token: "", connected: false },
 };
 
+// Helper: unwrap axios response supporting both { data: ... } or raw data or { items: ... }
+function unwrap<T>(resData: any): T {
+  if (resData === null || resData === undefined) return resData;
+  if (resData.data !== undefined) return resData.data;
+  if (Array.isArray(resData.items)) return resData.items as unknown as T;
+  return resData as T;
+}
+
 // ============================================================
 // Helper: wrap API calls with fallback to mock data
 // ============================================================
 async function withFallback<T>(call: () => Promise<T>, fallback: T): Promise<T> {
   try {
-    return await call();
-  } catch {
+    const result = await call();
+    if (result === undefined || result === null) return fallback;
+    return result;
+  } catch (err) {
+    console.warn("API request failed, using fallback:", err);
     return fallback;
   }
 }
@@ -301,15 +312,15 @@ async function withFallback<T>(call: () => Promise<T>, fallback: T): Promise<T> 
 // ============================================================
 export async function getDashboardStats(): Promise<DashboardStats> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<DashboardStats>>("/dashboard/stats");
-    return data.data;
+    const { data } = await api.get("/dashboard/stats");
+    return unwrap<DashboardStats>(data);
   }, MOCK_STATS);
 }
 
 export async function getActivityFeed(): Promise<ActivityItem[]> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<ActivityItem[]>>("/dashboard/activity");
-    return data.data;
+    const { data } = await api.get("/dashboard/activity");
+    return unwrap<ActivityItem[]>(data);
   }, MOCK_ACTIVITY);
 }
 
@@ -318,26 +329,26 @@ export async function getActivityFeed(): Promise<ActivityItem[]> {
 // ============================================================
 export async function getProjects(): Promise<Project[]> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<Project[]>>("/projects");
-    return data.data;
+    const { data } = await api.get("/projects");
+    return unwrap<Project[]>(data);
   }, MOCK_PROJECTS);
 }
 
 export async function getProject(id: string): Promise<Project | undefined> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<Project>>(`/projects/${id}`);
-    return data.data;
+    const { data } = await api.get(`/projects/${id}`);
+    return unwrap<Project>(data);
   }, MOCK_PROJECTS.find((p) => String(p.id) === String(id)));
 }
 
 export async function createProject(project: Partial<Project>): Promise<Project> {
-  const { data } = await api.post<ApiResponse<Project>>("/projects", project);
-  return data.data;
+  const { data } = await api.post("/projects", project);
+  return unwrap<Project>(data);
 }
 
 export async function updateProject(id: string, project: Partial<Project>): Promise<Project> {
-  const { data } = await api.put<ApiResponse<Project>>(`/projects/${id}`, project);
-  return data.data;
+  const { data } = await api.put(`/projects/${id}`, project);
+  return unwrap<Project>(data);
 }
 
 export async function deleteProject(id: string): Promise<void> {
@@ -349,27 +360,27 @@ export async function deleteProject(id: string): Promise<void> {
 // ============================================================
 export async function getVideos(): Promise<Video[]> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<Video[]>>("/videos");
-    return data.data;
+    const { data } = await api.get("/videos");
+    return unwrap<Video[]>(data);
   }, MOCK_VIDEOS);
 }
 
 export async function getVideo(id: string): Promise<Video | undefined> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<Video>>(`/videos/${id}`);
-    return data.data;
+    const { data } = await api.get(`/videos/${id}`);
+    return unwrap<Video>(data);
   }, MOCK_VIDEOS.find((v) => String(v.id) === String(id)));
 }
 
 export async function generateVideo(request: GenerateVideoRequest): Promise<Video> {
-  const { data } = await api.post<ApiResponse<Video>>("/videos/generate", request);
-  return data.data;
+  const { data } = await api.post("/videos/generate", request);
+  return unwrap<Video>(data);
 }
 
 export async function getVideoStatus(id: string): Promise<Video> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<Video>>(`/videos/${id}/status`);
-    return data.data;
+    const { data } = await api.get(`/videos/${id}/status`);
+    return unwrap<Video>(data);
   }, MOCK_VIDEOS.find((v) => String(v.id) === String(id))!);
 }
 
@@ -381,20 +392,20 @@ export async function deleteVideo(id: string): Promise<void> {
 // Social / Publish
 // ============================================================
 export async function publishVideo(request: PublishRequest): Promise<SocialPost[]> {
-  const { data } = await api.post<ApiResponse<SocialPost[]>>("/social/publish", request);
-  return data.data;
+  const { data } = await api.post("/social/publish", request);
+  return unwrap<SocialPost[]>(data);
 }
 
 export async function getPosts(): Promise<SocialPost[]> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<SocialPost[]>>("/social/posts");
-    return data.data;
+    const { data } = await api.get("/social/posts");
+    return unwrap<SocialPost[]>(data);
   }, MOCK_POSTS);
 }
 
 export async function getPostStatus(id: string): Promise<SocialPost> {
-  const { data } = await api.get<ApiResponse<SocialPost>>(`/social/posts/${id}/status`);
-  return data.data;
+  const { data } = await api.get(`/social/posts/${id}/status`);
+  return unwrap<SocialPost>(data);
 }
 
 export async function deletePost(id: string): Promise<void> {
@@ -406,19 +417,19 @@ export async function deletePost(id: string): Promise<void> {
 // ============================================================
 export async function getTemplates(): Promise<PromptTemplate[]> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<PromptTemplate[]>>("/templates");
-    return data.data;
+    const { data } = await api.get("/templates");
+    return unwrap<PromptTemplate[]>(data);
   }, MOCK_TEMPLATES);
 }
 
 export async function createTemplate(template: Partial<PromptTemplate>): Promise<PromptTemplate> {
-  const { data } = await api.post<ApiResponse<PromptTemplate>>("/templates", template);
-  return data.data;
+  const { data } = await api.post("/templates", template);
+  return unwrap<PromptTemplate>(data);
 }
 
 export async function updateTemplate(id: string, template: Partial<PromptTemplate>): Promise<PromptTemplate> {
-  const { data } = await api.put<ApiResponse<PromptTemplate>>(`/templates/${id}`, template);
-  return data.data;
+  const { data } = await api.put(`/templates/${id}`, template);
+  return unwrap<PromptTemplate>(data);
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
@@ -426,8 +437,8 @@ export async function deleteTemplate(id: string): Promise<void> {
 }
 
 export async function previewTemplate(id: string, variables: Record<string, string>): Promise<string> {
-  const { data } = await api.post<ApiResponse<string>>(`/templates/${id}/preview`, { variables });
-  return data.data;
+  const { data } = await api.post(`/templates/${id}/preview`, { variables });
+  return unwrap<string>(data);
 }
 
 // ============================================================
@@ -435,19 +446,23 @@ export async function previewTemplate(id: string, variables: Record<string, stri
 // ============================================================
 export async function getSettings(): Promise<Settings> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<Settings>>("/settings");
-    return data.data;
+    const { data } = await api.get("/settings");
+    return unwrap<Settings>(data);
   }, MOCK_SETTINGS);
 }
 
 export async function updateSettings(settings: Partial<Settings>): Promise<Settings> {
-  const { data } = await api.put<ApiResponse<Settings>>("/settings", settings);
-  return data.data;
+  const { data } = await api.put("/settings", settings);
+  return unwrap<Settings>(data);
 }
 
-export async function testConnection(platform: string): Promise<{ connected: boolean; message: string }> {
-  const { data } = await api.post<ApiResponse<{ connected: boolean; message: string }>>(`/settings/test/${platform}`);
-  return data.data;
+export async function testConnection(platform: string): Promise<{ connected: boolean; message?: string; error?: string }> {
+  try {
+    const { data } = await api.post(`/settings/test-connection/${platform}`);
+    return unwrap(data);
+  } catch (err: any) {
+    return { connected: false, error: err.response?.data?.detail || err.message };
+  }
 }
 
 // ============================================================
@@ -469,29 +484,29 @@ export async function confirmPlan(payload: {
 // AI helpers
 // ============================================================
 export async function enhancePrompt(prompt: string): Promise<string> {
-  const { data } = await api.post<ApiResponse<string>>("/ai/enhance-prompt", { prompt });
-  return data.data;
+  const { data } = await api.post("/ai/enhance-prompt", { prompt });
+  return unwrap<string>(data);
 }
 
 export async function generateScript(topic: string, duration?: number): Promise<string> {
-  const { data } = await api.post<ApiResponse<string>>("/ai/generate-script", { topic, duration });
-  return data.data;
+  const { data } = await api.post("/ai/generate-script", { topic, duration });
+  return unwrap<string>(data);
 }
 
 export async function suggestHashtags(caption: string, platform: string): Promise<string[]> {
-  const { data } = await api.post<ApiResponse<string[]>>("/ai/suggest-hashtags", { caption, platform });
-  return data.data;
+  const { data } = await api.post("/ai/suggest-hashtags", { caption, platform });
+  return unwrap<string[]>(data);
 }
 
 export async function generateCaption(videoTitle: string, platform: string): Promise<string> {
-  const { data } = await api.post<ApiResponse<string>>("/ai/generate-caption", { video_title: videoTitle, platform });
-  return data.data;
+  const { data } = await api.post("/ai/generate-caption", { video_title: videoTitle, platform });
+  return unwrap<string>(data);
 }
 
 export async function getProjectVideos(projectId: string): Promise<Video[]> {
   return withFallback(async () => {
-    const { data } = await api.get<ApiResponse<Video[]>>(`/projects/${projectId}/videos`);
-    return data.data;
+    const { data } = await api.get(`/projects/${projectId}/videos`);
+    return unwrap<Video[]>(data);
   }, MOCK_VIDEOS.filter((v) => String(v.project_id) === String(projectId)));
 }
 
