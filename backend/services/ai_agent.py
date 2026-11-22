@@ -54,21 +54,22 @@ class AIAgent:
 
         client = self._get_client()
         if client:
-            try:
-                result = await asyncio.to_thread(
-                    client.models.generate_content,
-                    model="gemini-2.0-flash",
-                    contents=user_prompt,
-                    config={
-                        "system_instruction": system_prompt,
-                        "temperature": 0.8,
-                        "max_output_tokens": 2048,
-                    },
-                )
-                if result and result.text:
-                    return result.text.strip()
-            except Exception as exc:
-                logger.warning("Gemini API call failed: %s", exc)
+            for model_name in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+                try:
+                    result = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=model_name,
+                        contents=user_prompt,
+                        config={
+                            "system_instruction": system_prompt,
+                            "temperature": 0.8,
+                            "max_output_tokens": 2048,
+                        },
+                    )
+                    if result and result.text:
+                        return result.text.strip()
+                except Exception as exc:
+                    logger.warning("Gemini model %s call failed: %s", model_name, exc)
 
         # Fallback to Kimi if configured
         if self.kimi.active_key:
@@ -152,18 +153,22 @@ class AIAgent:
                     f"Giọng đọc: {gender_info['name']} - Sắc thái: {tone_info['name']}\n"
                     "Hãy phân tích và xuất JSON kế hoạch sản xuất video hoàn chỉnh."
                 )
-                res = await asyncio.to_thread(
-                    client.models.generate_content,
-                    model="gemini-2.0-flash",
-                    contents=user_msg,
-                    config={
-                        "system_instruction": system_instruction,
-                        "response_mime_type": "application/json",
-                        "temperature": 0.7,
-                    },
-                )
-                if res and res.text:
-                    return json.loads(res.text)
+                for model_name in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+                    try:
+                        res = await asyncio.to_thread(
+                            client.models.generate_content,
+                            model=model_name,
+                            contents=user_msg,
+                            config={
+                                "system_instruction": system_instruction,
+                                "response_mime_type": "application/json",
+                                "temperature": 0.7,
+                            },
+                        )
+                        if res and res.text:
+                            return json.loads(res.text)
+                    except Exception as model_err:
+                        logger.warning("Gemini model %s failed: %s", model_name, model_err)
             except Exception as e:
                 logger.warning("Gemini confirm_skill failed, falling back to smart synthesis: %s", e)
 
