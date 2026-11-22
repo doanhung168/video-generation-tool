@@ -181,77 +181,12 @@ export default function CreateVideoPage() {
       setCurrentStep(2);
     } catch (err: any) {
       console.error("Confirmation error:", err);
-      // Fallback local plan if offline
-      const langName = LANGUAGES.find((l) => l.id === language)?.name || "Tiếng Việt";
-      const gName = voiceGender === "male" ? "Giọng Nam" : voiceGender === "female" ? "Giọng Nữ" : "Chỉ Nhạc Nền";
-      const tag = `[${gName} | ${langName}]`;
-
-      const mockPlan: ConfirmedPlan = {
-        title: `Video Sáng Tạo: ${topic.slice(0, 35)}...`,
-        agent_profile: `AI ${agentRole} phụ trách chỉ đạo kịch bản, âm thanh và phân cảnh`,
-        confirmed_skills: selectedSkills,
-        language,
-        voice_gender: voiceGender,
-        voice_tone: voiceTone,
-        scenes: [
-          {
-            scene_num: 1,
-            duration_seconds: 3,
-            visual_prompt: `Dynamic low-angle slow motion establishing shot of ${topic}, soft volumetric lighting, 35mm lens, 4k photorealistic.`,
-            camera_angle: "Low-angle smooth tracking shot",
-            lighting: "Golden hour glow & volumetric haze",
-            voiceover:
-              voiceGender === "none"
-                ? "[Nhạc nền sôi động, không lời]"
-                : language === "vi"
-                ? "Tự tin trong từng bước chuyển động, định hình phong cách riêng của bạn."
-                : "Step into confidence and make every movement your personal statement.",
-            voice_tag: tag,
-          },
-          {
-            scene_num: 2,
-            duration_seconds: 5,
-            visual_prompt: `Hyper-detailed macro close-up showcasing textures, materials, and elegant details under studio lighting.`,
-            camera_angle: "Macro slow pan with shallow depth of field",
-            lighting: "High contrast studio rim highlights",
-            voiceover:
-              voiceGender === "none"
-                ? "[Nhịp điệu dồn dập, hiệu ứng âm thanh sống động]"
-                : language === "vi"
-                ? "Thiết kế thời thượng, êm ái vượt trội cho ngày dài năng động."
-                : "Unrivaled comfort engineered for all-day elegance and performance.",
-            voice_tag: tag,
-          },
-          {
-            scene_num: 3,
-            duration_seconds: duration - 8 > 0 ? duration - 8 : 4,
-            visual_prompt: `Confident cinematic hero shot, seamless camera sweep revealing full view against metropolitan skyline at dusk.`,
-            camera_angle: "Wide crane pullback reveal",
-            lighting: "Golden hour glow with dramatic reflections",
-            voiceover:
-              voiceGender === "none"
-                ? "[Cao trào âm nhạc, hiển thị nhận diện thương hiệu]"
-                : language === "vi"
-                ? "Nâng tầm phong cách mỗi ngày. Khám phá ngay hôm nay!"
-                : "Own every step. Discover the new collection today!",
-            voice_tag: tag,
-          },
-        ],
-        master_video_prompt: `Masterpiece cinematic 4K commercial video of ${topic}. Shot on 35mm Arri Alexa, ${style} aesthetic, professional color grading, dynamic camera movement, volumetric lighting, photorealistic details. [Audio Directive: ${
-          voiceGender === "none"
-            ? "Instrumental background music only, no voiceover"
-            : `${voiceGender === "male" ? "Male" : "Female"} voiceover in ${langName}, energetic tone, crisp studio recording`
-        }]`,
-        social_captions: {
-          facebook: `🚀 Trải nghiệm video được tạo tự động bởi AI (${engine.toUpperCase()})!`,
-          tiktok: `🔥 Cực phẩm đã chính thức ra mắt! #fyp #viral #ai #xuhuong`,
-          youtube: `Video chi tiết - Sản xuất tự động bởi AutoVideo AI (${engine.toUpperCase()}).`,
-        },
-        hashtags: ["#AIvideo", "#Veo3", "#Wan21", "#Seedance", "#Cinematic", "#Viral"],
-      };
-      setPlan(mockPlan);
-      setEditableMasterPrompt(mockPlan.master_video_prompt);
-      setCurrentStep(2);
+      const errDetail =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message ||
+        "Không thể kết nối đến máy chủ AI";
+      setErrorMsg(`Lỗi kết nối AI: ${errDetail}. Vui lòng kiểm tra backend hoặc thử lại.`);
     } finally {
       setConfirming(false);
     }
@@ -387,6 +322,22 @@ export default function CreateVideoPage() {
       {/* STEP 1: SCRIPT, ENGINE & AGENT SELECTION */}
       {currentStep === 1 && (
         <div className="space-y-6">
+          {errorMsg && (
+            <div className="p-4 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-sm flex items-center justify-between shadow-lg">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setErrorMsg(null)}
+                className="text-red-400 hover:text-white text-xs font-semibold underline ml-4"
+              >
+                Đóng
+              </button>
+            </div>
+          )}
+
           {/* Script / Prompt Input Box */}
           <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6 space-y-4 backdrop-blur-sm">
             <div className="flex items-center justify-between">

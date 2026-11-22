@@ -54,7 +54,7 @@ class AIAgent:
 
         client = self._get_client()
         if client:
-            for model_name in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+            for model_name in ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash"]:
                 try:
                     result = await asyncio.to_thread(
                         client.models.generate_content,
@@ -62,7 +62,7 @@ class AIAgent:
                         contents=user_prompt,
                         config={
                             "system_instruction": system_prompt,
-                            "temperature": 0.8,
+                            "temperature": 0.7,
                             "max_output_tokens": 2048,
                         },
                     )
@@ -153,7 +153,7 @@ class AIAgent:
                     f"Giọng đọc: {gender_info['name']} - Sắc thái: {tone_info['name']}\n"
                     "Hãy phân tích và xuất JSON kế hoạch sản xuất video hoàn chỉnh."
                 )
-                for model_name in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+                for model_name in ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash"]:
                     try:
                         res = await asyncio.to_thread(
                             client.models.generate_content,
