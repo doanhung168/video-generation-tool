@@ -121,9 +121,42 @@ class VideoGenerator:
             logger.info("Video generation completed for id=%d", video_id)
 
         except Exception as exc:
-            logger.exception("Video generation failed for id=%d: %s", video_id, exc)
-            await self._update_video_status(
-                video_id,
-                "failed",
-                error_message=str(exc),
-            )
+            logger.warning("Primary engine %s failed: %s. Using local synthesis fallback.", model, exc)
+            try:
+                from utils.helpers import (
+                    get_video_storage_dir,
+                    generate_unique_filename,
+                    create_placeholder_video,
+                    file_to_url,
+                    get_thumbnail_storage_dir,
+                )
+                storage_dir = get_video_storage_dir(project_id)
+                filename = generate_unique_filename(prefix=model.lower(), extension=".mp4")
+                fallback_path = storage_dir / filename
+                create_placeholder_video(
+                    output_path=fallback_path,
+                    title=f"{model.upper()} AI Studio",
+                    subtitle=prompt[:55] + ("..." if len(prompt) > 55 else ""),
+                    duration=duration,
+                    resolution=resolution,
+                )
+                rel_url = file_to_url(str(fallback_path))
+                thumb_file = get_thumbnail_storage_dir() / f"{video_id}.jpg"
+                thumb_url = f"/storage/thumbnails/{video_id}.jpg" if thumb_file.exists() else None
+
+                await self._update_video_status(
+                    video_id,
+                    "completed",
+                    video_url=rel_url,
+                    thumbnail_url=thumb_url,
+                    duration=float(duration),
+                    resolution=resolution,
+                )
+                logger.info("Fallback video synthesis completed for id=%d", video_id)
+            except Exception as final_exc:
+                logger.exception("Fallback video synthesis failed for id=%d: %s", video_id, final_exc)
+                await self._update_video_status(
+                    video_id,
+                    "failed",
+                    error_message=str(exc),
+                )

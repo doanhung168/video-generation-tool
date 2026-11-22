@@ -5,7 +5,7 @@ from typing import Optional
 import httpx
 
 from config import settings
-from utils.helpers import get_video_storage_dir, generate_unique_filename
+from utils.helpers import get_video_storage_dir, generate_unique_filename, file_to_url
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class SeedanceService:
                                     video_result_url = poll_data.get("video_url")
                                     v_resp = await client.get(video_result_url)
                                     output_path.write_bytes(v_resp.content)
-                                    rel_url = f"/storage/{project_id or 'default'}/{filename}"
+                                    rel_url = file_to_url(str(output_path))
                                     return {
                                         "file_path": str(output_path),
                                         "video_url": rel_url,
@@ -90,7 +90,7 @@ class SeedanceService:
             duration=duration,
         )
 
-        rel_url = f"/storage/{project_id or 'default'}/{filename}"
+        rel_url = file_to_url(str(output_path))
         return {
             "file_path": str(output_path),
             "video_url": rel_url,

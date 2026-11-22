@@ -27,7 +27,7 @@ import {
   Globe,
   Volume2,
 } from "lucide-react";
-import { confirmPlan, generateVideo, uploadMediaFile } from "@/lib/api";
+import { confirmPlan, generateVideo, getVideo, uploadMediaFile } from "@/lib/api";
 import type { ConfirmedPlan } from "@/lib/types";
 
 const LANGUAGES = [
@@ -264,18 +264,15 @@ export default function CreateVideoPage() {
     setPlan({ ...plan, scenes: updated });
   };
 
-  // Step 2 -> Step 3: Trigger Final Video Generation
+  // Step 2 -> Step 3: Trigger Final Video Generation with Live Status Polling
   const handleConfirmAndGenerate = async () => {
     setGenerating(true);
     setCurrentStep(3);
     setGenerationProgress(15);
+    setErrorMsg(null);
+    setGeneratedVideo(null);
 
     try {
-      // Simulate progress bar smoothly
-      const progressTimer = setInterval(() => {
-        setGenerationProgress((p) => (p < 85 ? p + 10 : p));
-      }, 700);
-
       const resp = await generateVideo({
         prompt: editableMasterPrompt,
         title: plan?.title || topic.slice(0, 40),
@@ -291,9 +288,43 @@ export default function CreateVideoPage() {
         voice_tone: voiceTone,
       });
 
-      clearInterval(progressTimer);
+      const videoId = String(resp.id);
+      setGenerationProgress(30);
+
+      // Poll until video reaches "completed" or "failed"
+      let attempts = 0;
+      const maxAttempts = 60; // 60 * 1.5s = 90s
+      let finalVideo: any = resp;
+
+      while (attempts < maxAttempts) {
+        attempts++;
+        await new Promise((r) => setTimeout(r, 1500));
+
+        try {
+          const current = await getVideo(videoId);
+          if (current) {
+            finalVideo = current;
+            if (current.status === "completed") {
+              setGeneratedVideo(current);
+              setGenerationProgress(100);
+              setGenerating(false);
+              return;
+            } else if (current.status === "failed") {
+              throw new Error(current.error_message || "Quá trình render video trên máy chủ thất bại.");
+            } else {
+              // Still generating, advance progress bar
+              setGenerationProgress((prev) => (prev < 90 ? prev + 8 : prev));
+            }
+          }
+        } catch (pollErr: any) {
+          if (pollErr.message && (pollErr.message.includes("thất bại") || pollErr.message.includes("failed"))) {
+            throw pollErr;
+          }
+        }
+      }
+
+      setGeneratedVideo(finalVideo);
       setGenerationProgress(100);
-      setGeneratedVideo(resp);
     } catch (err: any) {
       console.error("Generation error:", err);
       setErrorMsg(err.message || "Lỗi khi render video.");
@@ -1062,10 +1093,10 @@ export default function CreateVideoPage() {
               <div className="w-16 h-16 rounded-full bg-indigo-500/10 border-2 border-indigo-500 border-t-transparent animate-spin mx-auto" />
               <div>
                 <h3 className="text-lg font-bold text-white">
-                  Đang khởi tạo video với {engine.toUpperCase()}...
+                  Đang render video với {engine.toUpperCase()}...
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Đang render các khung hình, xử lý ánh sáng thể tích và âm thanh.
+                  Đang tổng hợp phân cảnh, xử lý ánh sáng thể tích và đồng bộ voiceover.
                 </p>
               </div>
 
@@ -1076,9 +1107,36 @@ export default function CreateVideoPage() {
                   style={{ width: `${generationProgress}%` }}
                 />
               </div>
-              <span className="text-xs font-mono text-indigo-400 font-semibold">
-                {generationProgress}% Hoàn tất
-              </span>
+              <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+                <span>Trạng thái: Đang xử lý...</span>
+                <span className="text-indigo-400 font-bold">{generationProgress}%</span>
+              </div>
+            </div>
+          ) : errorMsg ? (
+            <div className="py-8 space-y-4 max-w-md mx-auto">
+              <div className="inline-flex p-3 rounded-full bg-red-500/20 text-red-400">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Render Video Thất Bại</h2>
+              <p className="text-xs text-red-300 bg-red-950/40 border border-red-500/30 p-3 rounded-xl text-left font-mono">
+                {errorMsg}
+              </p>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmAndGenerate}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all"
+                >
+                  Thử Render Lại
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  className="px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-all"
+                >
+                  Quay Lại Kịch Bản
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-6">
@@ -1091,19 +1149,73 @@ export default function CreateVideoPage() {
               </p>
 
               {/* Video preview player */}
-              {generatedVideo?.video_url && (
-                <div className="max-w-xl mx-auto rounded-xl overflow-hidden border border-slate-800 shadow-2xl bg-black aspect-video">
+              {generatedVideo?.video_url ? (
+                <div className="max-w-2xl mx-auto rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-black aspect-video relative group">
                   <video
-                    src={`http://localhost:8000${generatedVideo.video_url}`}
+                    src={
+                      generatedVideo.video_url.startsWith("http")
+                        ? generatedVideo.video_url
+                        : `http://localhost:8000${generatedVideo.video_url}`
+                    }
                     controls
                     autoPlay
                     className="w-full h-full object-contain"
                   />
                 </div>
+              ) : (
+                <div className="p-8 rounded-xl bg-slate-950 border border-slate-800 max-w-md mx-auto text-slate-400 text-xs space-y-3">
+                  <p>Đang chuẩn bị file video phát trực tiếp...</p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (generatedVideo?.id) {
+                        const v = await getVideo(String(generatedVideo.id));
+                        if (v) setGeneratedVideo(v);
+                      }
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium"
+                  >
+                    Tải Lại Trạng Thái Video
+                  </button>
+                </div>
+              )}
+
+              {/* Video Meta Info */}
+              {generatedVideo?.video_url && (
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  <span className="text-[11px] px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300 font-mono">
+                    Model: {engine.toUpperCase()}
+                  </span>
+                  <span className="text-[11px] px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300 font-mono">
+                    Thời lượng: {duration}s
+                  </span>
+                  <span className="text-[11px] px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300 font-mono">
+                    Độ phân giải: {resolution}
+                  </span>
+                  <span className="text-[11px] px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-amber-300 font-mono">
+                    🎙️ {voiceGender === "none" ? "Chỉ Nhạc Nền" : voiceGender === "male" ? "Giọng Nam" : "Giọng Nữ"}
+                  </span>
+                </div>
               )}
 
               {/* Quick actions */}
               <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+                {generatedVideo?.video_url && (
+                  <a
+                    href={
+                      generatedVideo.video_url.startsWith("http")
+                        ? generatedVideo.video_url
+                        : `http://localhost:8000${generatedVideo.video_url}`
+                    }
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4 rotate-180" />
+                    Tải Video Về Máy (.mp4)
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() =>

@@ -1,11 +1,16 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
+
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_DB_URL = f"sqlite+aiosqlite:///{BASE_DIR / 'video_gen.db'}"
+DEFAULT_STORAGE = str((BASE_DIR.parent / "storage").resolve())
 
 
 class Settings(BaseSettings):
     # App & Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./video_gen.db"
-    STORAGE_PATH: str = "../storage"
+    DATABASE_URL: str = DEFAULT_DB_URL
+    STORAGE_PATH: str = DEFAULT_STORAGE
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
