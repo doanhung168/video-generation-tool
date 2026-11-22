@@ -48,55 +48,63 @@ class Veo3Service:
 
         client = self._get_client()
         if client and self.api_key:
-            try:
-                operation = await asyncio.to_thread(
-                    client.models.generate_videos,
-                    model="veo-3.0-generate-preview",
-                    prompt=prompt,
-                    config={
-                        "person_generation": "allow_all",
-                        "aspect_ratio": aspect_ratio,
-                        "number_of_videos": 1,
-                    },
-                )
-
-                # Poll until the operation completes
-                max_polls = 120
-                poll_interval = 10
-                for i in range(max_polls):
-                    result = await asyncio.to_thread(
-                        client.operations.get, operation=operation
+            from google.genai import types
+            candidate_models = [
+                "veo-3.1-generate-001",
+                "veo-3.1-fast-generate-preview",
+                "veo-3.1-generate-preview",
+                "veo-2.0-generate-001",
+            ]
+            for model_name in candidate_models:
+                try:
+                    config = types.GenerateVideosConfig(
+                        aspect_ratio=aspect_ratio if aspect_ratio in ("16:9", "9:16") else "16:9",
+                        person_generation="allow_all",
                     )
-                    if result.done:
-                        break
-                    logger.debug("Veo3 poll %d/%d – still generating...", i + 1, max_polls)
-                    await asyncio.sleep(poll_interval)
-                else:
-                    raise TimeoutError(f"Veo3 video generation timed out after {max_polls * poll_interval}s")
+                    operation = await asyncio.to_thread(
+                        client.models.generate_videos,
+                        model=model_name,
+                        prompt=prompt,
+                        config=config,
+                    )
 
-                if result.response and result.response.generated_videos:
-                    generated_video = result.response.generated_videos[0]
-                    video_data = generated_video.video
+                    # Poll until the operation completes
+                    max_polls = 120
+                    poll_interval = 10
+                    for i in range(max_polls):
+                        result = await asyncio.to_thread(
+                            client.operations.get, operation=operation
+                        )
+                        if result.done:
+                            break
+                        logger.debug("Veo3 poll %d/%d on %s – generating...", i + 1, max_polls, model_name)
+                        await asyncio.sleep(poll_interval)
+                    else:
+                        raise TimeoutError(f"Veo3 video generation timed out after {max_polls * poll_interval}s")
 
-                    if hasattr(video_data, "uri") and video_data.uri:
-                        import httpx
-                        async with httpx.AsyncClient() as http_client:
-                            resp = await http_client.get(video_data.uri)
-                            resp.raise_for_status()
-                            output_path.write_bytes(resp.content)
-                    elif hasattr(video_data, "video_bytes") and video_data.video_bytes:
-                        output_path.write_bytes(video_data.video_bytes)
+                    if result.response and result.response.generated_videos:
+                        generated_video = result.response.generated_videos[0]
+                        if hasattr(generated_video.video, "save"):
+                            generated_video.video.save(str(output_path))
+                        elif hasattr(generated_video.video, "uri") and generated_video.video.uri:
+                            import httpx
+                            async with httpx.AsyncClient() as http_client:
+                                resp = await http_client.get(generated_video.video.uri)
+                                resp.raise_for_status()
+                                output_path.write_bytes(resp.content)
+                        elif hasattr(generated_video.video, "video_bytes") and generated_video.video.video_bytes:
+                            output_path.write_bytes(generated_video.video.video_bytes)
 
-                    rel_url = f"/storage/videos/{'project_' + str(project_id) + '/' if project_id else ''}{filename}"
-                    return {
-                        "file_path": str(output_path),
-                        "video_url": rel_url,
-                        "duration": float(duration),
-                        "resolution": resolution,
-                        "model": "veo3",
-                    }
-            except Exception as exc:
-                logger.warning("Veo3 API call failed or key inactive: %s. Using local synthesis.", exc)
+                        rel_url = f"/storage/videos/{'project_' + str(project_id) + '/' if project_id else ''}{filename}"
+                        return {
+                            "file_path": str(output_path),
+                            "video_url": rel_url,
+                            "duration": float(duration),
+                            "resolution": resolution,
+                            "model": model_name,
+                        }
+                except Exception as exc:
+                    logger.warning("Veo3 model %s attempt failed: %s", model_name, exc)
 
         # Local synthesis fallback
         await asyncio.sleep(2)
